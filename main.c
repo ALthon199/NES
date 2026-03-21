@@ -1,8 +1,10 @@
 #include <SDL2/SDL.h>
 #include <stdbool.h>
 #include <assert.h>
-
-bool LDA_Test(void);
+#include "opcodes.h"
+#include "CPU.h"
+#include "Bus.h"
+#include "tests.h"
 
 int main(int argc, char *argv[]) {
     SDL_Init(SDL_INIT_VIDEO);

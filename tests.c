@@ -1,11 +1,13 @@
 #include "CPU.h"
 #include "Bus.h"
+#include "opcodes.h"
+#include "tests.h"
 #include <stdbool.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-uint8_t LDA(CPU_6502* CPU);
+
 
 
 bool LDA_Test(){
@@ -28,7 +30,9 @@ bool LDA_Test(){
     assert((((bus -> CPU -> Reg_Status) >> 1) & 0x1) == 1);
 
     free(bus);
+    printf("LDA Test Passed\n");
     return true;
 
 
 }
+

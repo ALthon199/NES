@@ -23,6 +23,10 @@ static void write(CPU_6502* CPU, uint16_t address, uint8_t data){
 }
 
 
+void Fetch(CPU_6502* CPU){
+    CPU -> fetched = (*CPU -> cpu_read)(CPU, CPU -> addr_abs, false);
+}
+
 void Clock(CPU_6502* CPU){
     if (CPU -> cycles_left == 0){
         CPU -> opcode = (*(CPU -> cpu_read))(CPU, CPU -> PC, true);

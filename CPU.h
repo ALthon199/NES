@@ -6,14 +6,6 @@
 #include <stdbool.h>
 typedef struct Bus Bus;
 
-typedef struct{
-    char name[4];
-    uint8_t (*operate)(void);
-    uint8_t (*address_mode)(void);
-    
-    uint8_t cycles;
-
-} Instruction;
 
 typedef struct CPU_6502{
     
@@ -58,7 +50,16 @@ typedef struct CPU_6502{
 
 } CPU_6502;
 
-void Init_Instruction(CPU_6502* cpu);
+typedef struct{
+    char name[4];
+    uint8_t (*operate)(CPU_6502*);
+    uint8_t (*address_mode)(CPU_6502*);
+    
+    uint8_t cycles;
+
+} Instruction;
+
+void Init_Instructions(CPU_6502* cpu);
 
 void Clock(CPU_6502* cpu);
 
@@ -68,7 +69,7 @@ void IRQ();
 
 void NMI();
 
-void Fetch();
+void Fetch(CPU_6502* cpu);
 
 void CPU_6502_Init(CPU_6502* cpu, Bus* bus);
 
