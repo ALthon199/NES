@@ -45,8 +45,6 @@ uint8_t ZEROX_ADDR(CPU_6502* CPU){
 
 
 
-
-
 // Opcodes - Instructions
 uint8_t LDA(CPU_6502* CPU){
     CPU -> Reg_Acc = CPU -> fetched;

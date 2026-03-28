@@ -4,8 +4,20 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+// Forward Declaration of BUS to avoid circular dependency
 typedef struct Bus Bus;
 
+// Forward Declaration of CPU_6502 to avoid circular dependency
+typedef struct CPU_6502 CPU_6502;
+
+typedef struct{
+    char name[4];
+    uint8_t (*operate)(CPU_6502*);
+    uint8_t (*address_mode)(CPU_6502*);
+    
+    uint8_t cycles;
+
+} Instruction;
 
 typedef struct CPU_6502{
     
@@ -30,8 +42,6 @@ typedef struct CPU_6502{
     uint8_t Reg_Status;
 
 
-
-
     // Bus
     Bus* bus;
     uint8_t (*cpu_read)(struct CPU_6502* CPU, uint16_t address, bool read_only);
@@ -50,14 +60,6 @@ typedef struct CPU_6502{
 
 } CPU_6502;
 
-typedef struct{
-    char name[4];
-    uint8_t (*operate)(CPU_6502*);
-    uint8_t (*address_mode)(CPU_6502*);
-    
-    uint8_t cycles;
-
-} Instruction;
 
 void Init_Instructions(CPU_6502* cpu);
 

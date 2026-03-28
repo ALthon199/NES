@@ -1,9 +1,9 @@
 #include <SDL2/SDL.h>
 #include <stdbool.h>
 #include <assert.h>
-#include "opcodes.h"
-#include "CPU.h"
-#include "Bus.h"
+#include "components/CPU/opcodes.h"
+#include "components/CPU/CPU.h"
+#include "components/Bus/Bus.h"
 #include "tests.h"
 
 int main(int argc, char *argv[]) {

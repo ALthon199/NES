@@ -1,7 +1,7 @@
 #ifndef BUS_H
 #define BUS_H
 
-#include "CPU.h"
+#include "../CPU/CPU.h"
 #include <stdint.h>
 #include <stdbool.h>
 // 2KB of Memory

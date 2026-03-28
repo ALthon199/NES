@@ -1,6 +1,6 @@
-#include "CPU.h"
-#include "Bus.h"
-#include "opcodes.h"
+#include "components/CPU/CPU.h"
+#include "components/Bus/Bus.h"
+#include "components/CPU/opcodes.h"
 #include "tests.h"
 #include <stdbool.h>
 #include <assert.h>

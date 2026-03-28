@@ -1,5 +1,5 @@
 #include "CPU.h"
-#include "Bus.h"
+#include "../Bus/Bus.h"
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
