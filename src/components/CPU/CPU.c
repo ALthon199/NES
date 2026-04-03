@@ -22,14 +22,23 @@ static void write(CPU_6502* CPU, uint16_t address, uint8_t data){
     
 }
 
+void get_flag(CPU_6502* CPU, FLAGS_6502 F){
+    return (CPU -> Reg_Status && F) != 0;
+}
 
-void Fetch(CPU_6502* CPU){
+void set_flag(CPU_6502* CPU, FLAGS_6502 F, bool on){
+    if (on) CPU -> Reg_Status |= F;
+    else CPU -> Reg_Status &= (~F);
+}
+
+void fetch(CPU_6502* CPU){
     CPU -> fetched = (*CPU -> cpu_read)(CPU, CPU -> addr_abs, false);
 }
 
 void Clock(CPU_6502* CPU){
     if (CPU -> cycles_left == 0){
         CPU -> opcode = (*(CPU -> cpu_read))(CPU, CPU -> PC, true);
+        CPU -> PC++;
     }
 }
 
@@ -40,12 +49,8 @@ void CPU_6502_Init(CPU_6502* CPU, Bus *bus){
     CPU->cpu_write = &write;
 }
 
+// CPU will "disconnect"
 void CPU_6502_Destroy(CPU_6502* CPU){
-    if (CPU == NULL){
-        return;
-    }
-    if (CPU -> bus != NULL){
-        Bus_Destroy(CPU -> bus);
-    }
+    if (CPU == NULL) return;
     free(CPU);
 }

@@ -39,13 +39,15 @@ void Bus_Init(Bus* bus){
     bus -> write = &write;
 }
 
-
+// Bus will first disconnect components
 void Bus_Destroy(Bus* bus){
     if (bus == NULL){
         return;
     }
     if (bus -> CPU != NULL){
         CPU_6502_Destroy(bus -> CPU);
+        // Ensure CPU will not be freed after. 
+        bus -> CPU = NULL;
     }
     free(bus -> CPU);
 }

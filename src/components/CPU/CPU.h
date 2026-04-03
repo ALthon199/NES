@@ -19,6 +19,18 @@ typedef struct{
 
 } Instruction;
 
+
+typedef enum {
+    CARRY_F = 1 << 0,
+    ZERO_F = 1 << 1,
+    INTERRUPT_D_F = 1 << 2,
+    DECIMAL_F = 1 << 3,
+    BREAK_F = 1 << 4,
+    UNUSED_F = 1 << 5,
+    OVERFLOW_F = 1 << 6,
+    NEGATIVE_F = 1 << 7
+} FLAGS_6502;
+
 typedef struct CPU_6502{
     
     // Registers
@@ -41,9 +53,8 @@ typedef struct CPU_6502{
     // Bit 7: Negative Flag
     uint8_t Reg_Status;
 
-
     // Bus
-    Bus* bus;
+    Bus *bus;
     uint8_t (*cpu_read)(struct CPU_6502* CPU, uint16_t address, bool read_only);
     void (*cpu_write)(struct CPU_6502* CPU, uint16_t address, uint8_t data);
 
@@ -57,13 +68,16 @@ typedef struct CPU_6502{
     uint16_t addr_rel;
     uint8_t opcode;
     
-
 } CPU_6502;
 
 
-void Init_Instructions(CPU_6502* cpu);
+void Init_Instructions(CPU_6502 *cpu);
 
-void Clock(CPU_6502* cpu);
+void get_flag(CPU_6502 *CPU, FLAGS_6502 F);
+
+void set_flag(CPU_6502 *CPU, FLAGS_6502 F, bool on);
+
+void Clock(CPU_6502 *cpu);
 
 void Reset();
 
@@ -71,9 +85,9 @@ void IRQ();
 
 void NMI();
 
-void Fetch(CPU_6502* cpu);
+void Fetch(CPU_6502 *cpu);
 
-void CPU_6502_Init(CPU_6502* cpu, Bus* bus);
+void CPU_6502_Init(CPU_6502 *cpu, Bus *bus);
 
-void CPU_6502_Destroy(CPU_6502* cpu);
+void CPU_6502_Destroy(CPU_6502 *cpu);
 #endif

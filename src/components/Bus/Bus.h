@@ -6,11 +6,11 @@
 #include <stdbool.h>
 // 2KB of Memory
 #define RAM_SIZE 0x800
-
+#define STACK_START 0x100
 
 struct Bus{
 
-    CPU_6502* CPU;
+    CPU_6502 *CPU;
     uint8_t RAM[RAM_SIZE];
 
     uint8_t (*read)(Bus* bus, uint16_t address, bool read_only);
@@ -18,8 +18,8 @@ struct Bus{
 
 };
 
-void Bus_Init(Bus* bus);
+void Bus_Init(Bus *bus);
 
-void Bus_Destroy(Bus* bus);
+void Bus_Destroy(Bus *bus);
 
 #endif
