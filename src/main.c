@@ -29,7 +29,8 @@ int main(int argc, char *argv[]) {
         SDL_RenderClear(renderer);
         SDL_RenderPresent(renderer);
     }
-
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
     SDL_Quit();
     
     return 0;

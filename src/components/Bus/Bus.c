@@ -50,4 +50,6 @@ void Bus_Destroy(Bus* bus){
         bus -> CPU = NULL;
     }
     free(bus -> CPU);
+    free(bus);
+    bus = NULL;
 }

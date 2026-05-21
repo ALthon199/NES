@@ -11,7 +11,7 @@ typedef struct Bus Bus;
 typedef struct CPU_6502 CPU_6502;
 
 typedef struct{
-    char name[4];
+    const char *name;
     uint8_t (*operate)(CPU_6502*);
     uint8_t (*address_mode)(CPU_6502*);
     
@@ -55,8 +55,8 @@ typedef struct CPU_6502{
 
     // Bus
     Bus *bus;
-    uint8_t (*cpu_read)(struct CPU_6502* CPU, uint16_t address, bool read_only);
-    void (*cpu_write)(struct CPU_6502* CPU, uint16_t address, uint8_t data);
+    uint8_t (*cpu_read)(CPU_6502* CPU, uint16_t address, bool read_only);
+    void (*cpu_write)(CPU_6502* CPU, uint16_t address, uint8_t data);
 
     // Internal
     uint64_t total_cycles;
@@ -65,15 +65,15 @@ typedef struct CPU_6502{
     
     uint8_t fetched;
     uint16_t addr_abs;
-    uint16_t addr_rel;
+    int16_t addr_rel;
     uint8_t opcode;
     
 } CPU_6502;
 
 
-void Init_Instructions(CPU_6502 *cpu);
+void Instructions_Init(CPU_6502 *CPU);
 
-void get_flag(CPU_6502 *CPU, FLAGS_6502 F);
+bool get_flag(CPU_6502 *CPU, FLAGS_6502 F);
 
 void set_flag(CPU_6502 *CPU, FLAGS_6502 F, bool on);
 
@@ -85,9 +85,10 @@ void IRQ();
 
 void NMI();
 
-void Fetch(CPU_6502 *cpu);
+void fetch(CPU_6502 *cpu);
 
 void CPU_6502_Init(CPU_6502 *cpu, Bus *bus);
 
 void CPU_6502_Destroy(CPU_6502 *cpu);
+
 #endif
