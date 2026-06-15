@@ -5,8 +5,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 // 2KB of Memory
-#define RAM_SIZE 0x800
+#define RAM_SIZE 0x0800
 #define STACK_START 0x100
+#define RAM_END 0x1FFF
+#define RAM_MIRROR 0x07FF
+
 
 struct Bus{
 
@@ -18,8 +21,7 @@ struct Bus{
 
 };
 
-void Bus_Init(Bus *bus);
-
+Bus *Bus_Create();
 void Bus_Destroy(Bus *bus);
 
 #endif

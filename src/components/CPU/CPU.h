@@ -87,7 +87,7 @@ void NMI();
 
 void fetch(CPU_6502 *cpu);
 
-void CPU_6502_Init(CPU_6502 *cpu, Bus *bus);
+CPU_6502 *CPU_Create(Bus *bus);
 
 void CPU_6502_Destroy(CPU_6502 *cpu);
 

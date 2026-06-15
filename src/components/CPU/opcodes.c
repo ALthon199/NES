@@ -13,51 +13,182 @@ uint8_t IMP_ADDR(CPU_6502 *CPU){
     return 0;
 }
 
-// Loads a specific value directly (e.g. LDA #$05 -> Loads $05 into Accumulator)
+// Loads a specific value directly (e.g. LDA #$05->Loads $05 into Accumulator)
 // $05 is the next byte in memory 
 uint8_t IMM_ADDR(CPU_6502 *CPU){
-    CPU -> addr_abs = CPU -> PC;
-    CPU -> PC++;
+    CPU->addr_abs = CPU->PC;
+    CPU->PC++;
+    return 0;
+}
+
+// Use Reg_Acc as the value to be used for the instruction
+uint8_t ACC_ADDR(CPU_6502 *CPU){
     return 0;
 }
 
 
 // Next two bytes provide memory address (Byte 1 is the lowest 8 bytes, Byte 2 is the highest 8 bytes)
 uint8_t ABS_ADDR(CPU_6502 *CPU){
-    uint16_t low = (*CPU -> cpu_read)(CPU, CPU -> PC, false);
-    CPU -> PC++;
-    uint16_t high = (*CPU -> cpu_read)(CPU, CPU -> PC, false);
-    CPU -> PC++;
+    uint16_t low = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
+    uint16_t high = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
 
-    CPU -> addr_abs = (high << 8) + low;
+    CPU->addr_abs = (high << 8) | low;
     return 0;
+}
+
+// Next two bytes provide memory address then add Reg_X. Add cycle if needed
+uint8_t ABSX_ADDR(CPU_6502 *CPU){
+    uint16_t low = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
+    uint16_t high = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
+
+    uint16_t new_addr = (high << 8) | low;
+
+    CPU->addr_abs = new_addr + CPU->Reg_X;
+
+    if ((new_addr & 0xFF00) == (CPU->addr_abs & 0xFF00)){
+        return 0;
+    }
+
+    return 1;
+}
+
+// Next two bytes provide memory address then add Reg_Y. Add cycle if needed
+uint8_t ABSY_ADDR(CPU_6502 *CPU){
+    uint16_t low = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
+    uint16_t high = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
+
+    uint16_t new_addr = (high << 8) | low;
+
+    CPU->addr_abs = new_addr + CPU->Reg_Y;
+
+    if ((new_addr & 0xFF00) == (CPU->addr_abs & 0xFF00)){
+        return 0;
+    }
+
+    return 1;
 }
 
 // Loads Contents of a memory address from 0x00 to 0xFF
 // Same as ABS_ADDR except only one byte is needed
 uint8_t ZERO_ADDR(CPU_6502 *CPU){
-    uint8_t byte = (*CPU -> cpu_read)(CPU, CPU -> PC, false);
+    uint8_t byte = (*CPU->cpu_read)(CPU, CPU->PC, false);
     CPU-> PC++;
-    CPU -> addr_abs = byte;
+    CPU->addr_abs = byte;
     return 0;
 }
 
 // E.g. LDA $10 X, Adds X to content of memory address which is wrapped around (0x00 to 0xFF) if nessecary
 // Loads this memory address
 uint8_t ZEROX_ADDR(CPU_6502 *CPU){
-    uint8_t address = (*CPU -> cpu_read)(CPU, CPU -> PC, false);
-    CPU -> PC++;
+    uint8_t address = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
     // Will handle wrapping around because its 8 bit int.
-    address += CPU -> Reg_X;
-    CPU -> addr_abs = address;
+    address += CPU->Reg_X;
+    CPU->addr_abs = address;
     return 0;
 }
 
+
+// E.g. LDA $10 Y, Adds Y to content of memory address which is wrapped around (0x00 to 0xFF) if nessecary
+// Loads this memory address
+uint8_t ZEROY_ADDR(CPU_6502 *CPU){
+    uint8_t address = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
+    // Will handle wrapping around because its 8 bit int.
+    address += CPU->Reg_Y;
+    CPU->addr_abs = address;
+
+    return 0;
+}
+
+
+// Indirect
+uint8_t IND_ADDR(CPU_6502 *CPU){
+    uint16_t low = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
+    uint16_t high = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
+
+    uint16_t pointer = (high << 8) | low;
+    uint16_t low_addr = (*CPU->cpu_read)(CPU, pointer, false);
+    // 6502 Bug: If the low byte of the pointer is 0xFF, the high byte will be fetched from the beginning of the page instead of the next page
+    if ((pointer & 0x00FF) == 0x00FF){
+        pointer = pointer & 0xFF00;
+    }
+    else{
+        pointer++;
+    }
+
+    uint16_t high_addr = (*CPU->cpu_read)(CPU, pointer, false);
+
+    CPU->addr_abs = (high_addr << 8) | low_addr;
+    return 0;
+
+}
+
+// Indirect X
+uint8_t INDX_ADDR(CPU_6502 *CPU){
+    uint8_t byte = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
+    uint8_t pointer = byte + CPU->Reg_X;
+    
+    uint16_t low_addr = (*CPU->cpu_read)(CPU, (uint16_t)pointer, false);
+
+    if (pointer == 0xFF){
+        // Wraps to 0 
+        // Will wrap to zero regardless, but clarity
+        pointer = 0;
+    }   
+    else{
+        pointer++;
+    }
+    uint16_t high_addr = (*CPU->cpu_read)(CPU, (uint16_t)pointer, false);
+
+    CPU->addr_abs = (high_addr << 8) | low_addr;
+    return 0;
+}
+
+// Indirect Y
+uint8_t INDY_ADDR(CPU_6502 *CPU){
+    uint8_t byte = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
+    uint8_t pointer = byte;
+    
+    uint16_t low_addr = (*CPU->cpu_read)(CPU, (uint16_t)pointer, false);
+
+    if (pointer == 0xFF){
+        // Wraps to 0 
+        // Will wrap to zero regardless, but clarity
+        pointer = 0;
+    }   
+    else{
+        pointer++;
+    }
+    uint16_t high_addr = (*CPU->cpu_read)(CPU, (uint16_t)pointer, false);
+
+    uint16_t new_addr = (high_addr << 8) | low_addr;
+    CPU->addr_abs = new_addr + CPU->Reg_Y;
+
+    if ((new_addr & 0xFF00) == (CPU->addr_abs & 0xFF00)){
+        return 0;
+    }
+
+    return 1;
+}
+
+
+
 // Specififes Offset, implies a break is coming
 uint8_t REL_ADDR(CPU_6502 *CPU){
-    uint8_t offset = (*CPU -> cpu_read)(CPU, CPU -> PC, false);
-    CPU -> PC++;
-    CPU -> addr_rel = (int8_t)(offset);
+    uint8_t offset = (*CPU->cpu_read)(CPU, CPU->PC, false);
+    CPU->PC++;
+    CPU->addr_rel = (int8_t)(offset);
     return 0;
 }
 
@@ -73,7 +204,7 @@ uint8_t REL_ADDR(CPU_6502 *CPU){
 // Purely for Debugging purposes, indicates an invalid opcode was read
 
 uint8_t XXX(CPU_6502 *CPU){
-    printf("Invalid Opcode: %02X\n", CPU -> opcode);
+    printf("Invalid Opcode: %02X\n", CPU->opcode);
     return 0;
 }
 
@@ -89,10 +220,10 @@ uint8_t XXX(CPU_6502 *CPU){
 // If fetched value is <0, set negative flag
 uint8_t LDA(CPU_6502 *CPU){
     fetch(CPU);
-    CPU -> Reg_Acc = CPU -> fetched;
+    CPU->Reg_Acc = CPU->fetched;
 
-    set_flag(CPU, ZERO_F, CPU -> fetched == 0);
-    set_flag(CPU, NEGATIVE_F, (CPU -> fetched & NEGATIVE_F) != 0);
+    set_flag(CPU, ZERO_F, CPU->fetched == 0);
+    set_flag(CPU, NEGATIVE_F, (CPU->fetched & NEGATIVE_F) != 0);
 
     return 1;
 }
@@ -103,10 +234,10 @@ uint8_t LDA(CPU_6502 *CPU){
 // If fetched value is <0, set negative flag
 uint8_t LDX(CPU_6502 *CPU){
     fetch(CPU);
-    CPU -> Reg_X = CPU -> fetched;
+    CPU->Reg_X = CPU->fetched;
 
-    set_flag(CPU, ZERO_F, CPU -> fetched == 0);
-    set_flag(CPU, NEGATIVE_F, (CPU -> fetched & NEGATIVE_F) != 0);
+    set_flag(CPU, ZERO_F, CPU->fetched == 0);
+    set_flag(CPU, NEGATIVE_F, (CPU->fetched & NEGATIVE_F) != 0);
 
     return 1;
 }
@@ -117,32 +248,32 @@ uint8_t LDX(CPU_6502 *CPU){
 // If fetched value is < 0, set negative flag
 uint8_t LDY(CPU_6502 *CPU){
     fetch(CPU);
-    CPU -> Reg_Y = CPU -> fetched;
+    CPU->Reg_Y = CPU->fetched;
 
-    set_flag(CPU, ZERO_F, CPU -> fetched == 0);
-    set_flag(CPU, NEGATIVE_F, (CPU -> fetched & NEGATIVE_F) != 0);
+    set_flag(CPU, ZERO_F, CPU->fetched == 0);
+    set_flag(CPU, NEGATIVE_F, (CPU->fetched & NEGATIVE_F) != 0);
 
     return 1;
 }
 
 // Loads Accumulator into memory (fetched data)
 uint8_t STA(CPU_6502 *CPU){
-    uint16_t address = CPU -> addr_abs;
-    (*(CPU -> cpu_write))(CPU, address, CPU -> Reg_Acc);
+    uint16_t address = CPU->addr_abs;
+    (*(CPU->cpu_write))(CPU, address, CPU->Reg_Acc);
     return 0;
 }
 
 // Loads Reg X into memory (fetched data)
 uint8_t STX(CPU_6502 *CPU){
-    uint16_t address = CPU -> addr_abs;
-    (*(CPU -> cpu_write))(CPU, address, CPU -> Reg_X);
+    uint16_t address = CPU->addr_abs;
+    (*(CPU->cpu_write))(CPU, address, CPU->Reg_X);
     return 0;
 }
 
 // Loads Reg Y into memory (fetched data)
 uint8_t STY(CPU_6502 *CPU){
-    uint16_t address = CPU -> addr_abs;
-    (*(CPU -> cpu_write))(CPU, address, CPU -> Reg_Y);
+    uint16_t address = CPU->addr_abs;
+    (*(CPU->cpu_write))(CPU, address, CPU->Reg_Y);
     return 0;
 }
 
@@ -154,20 +285,20 @@ uint8_t STY(CPU_6502 *CPU){
 // Transfer Accumulator to X
 // Set zero and negative flags accordingly if accumulator value is negative or zero
 uint8_t TAX(CPU_6502 *CPU){
-    uint8_t value = CPU -> Reg_Acc;
+    uint8_t value = CPU->Reg_Acc;
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
-    CPU -> Reg_X = value;
+    CPU->Reg_X = value;
     return 0;
 }
 
 // Transfer Accumulator to Register Y
 // Set zero and negative flags accordingly if accumulator value is negative or zero
 uint8_t TAY(CPU_6502 *CPU){
-    uint8_t value = CPU -> Reg_Acc;
+    uint8_t value = CPU->Reg_Acc;
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
-    CPU -> Reg_Y = value;
+    CPU->Reg_Y = value;
     return 0;
 }
 
@@ -175,10 +306,10 @@ uint8_t TAY(CPU_6502 *CPU){
 // Transfer Register X to Accumulator 
 // Set zero and negative flags accordingly if accumulator value is negative or zero
 uint8_t TXA(CPU_6502 *CPU){
-    uint8_t value = CPU -> Reg_X;
+    uint8_t value = CPU->Reg_X;
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
-    CPU -> Reg_Acc = value;
+    CPU->Reg_Acc = value;
     return 0;
 }
 
@@ -186,10 +317,10 @@ uint8_t TXA(CPU_6502 *CPU){
 // Transfer Register Y to Accumulator
 // Set zero and negative flags accordingly if accumulator value is negative or zero
 uint8_t TYA(CPU_6502 *CPU){
-    uint8_t value = CPU -> Reg_Y;
+    uint8_t value = CPU->Reg_Y;
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
-    CPU -> Reg_Acc = value;
+    CPU->Reg_Acc = value;
     return 0;
 }
 
@@ -206,17 +337,17 @@ uint8_t TYA(CPU_6502 *CPU){
 // Push Accumulator to Stack
 // Decrement Stack Pointer
 uint8_t PHA(CPU_6502 *CPU){
-    CPU -> cpu_write(CPU, CPU -> SP + STACK_START, CPU -> Reg_Acc);
-    CPU -> SP--;
+    CPU->cpu_write(CPU, CPU->SP + STACK_START, CPU->Reg_Acc);
+    CPU->SP--;
     return 0;
 }
 
 // Increments Stack Pointer
 // Pulls Accumulator from stack
 uint8_t PLA(CPU_6502 *CPU){
-    CPU -> SP++;
-    uint8_t value = CPU -> cpu_read(CPU, CPU -> SP + STACK_START, false);
-    CPU -> Reg_Acc = value;
+    CPU->SP++;
+    uint8_t value = CPU->cpu_read(CPU, CPU->SP + STACK_START, false);
+    CPU->Reg_Acc = value;
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
     return 0;
@@ -225,34 +356,34 @@ uint8_t PLA(CPU_6502 *CPU){
 // Pushes Flags to the stack
 // Decrements stack Pointer
 uint8_t PHP(CPU_6502* CPU){
-    CPU -> cpu_write(CPU, CPU -> SP + STACK_START, CPU -> Reg_Status);
-    CPU -> SP--;
+    CPU->cpu_write(CPU, CPU->SP + STACK_START, CPU->Reg_Status);
+    CPU->SP--;
     return 0;
 }
 
 // Increments Stack Pointer
 // Pull Status Flags froms stack
 uint8_t PLP(CPU_6502* CPU){
-    CPU -> SP++;
-    CPU -> Reg_Acc = CPU -> cpu_read(CPU, CPU -> SP + STACK_START, false);
+    CPU->SP++;
+    CPU->Reg_Status = CPU->cpu_read(CPU, CPU->SP + STACK_START, false);
     return 0;
 }
 
 // Transfer Register X to Stack Pointer
 // NO FLAGS CAREFUL!!
 uint8_t TXS(CPU_6502 *CPU){
-    uint8_t value = CPU -> Reg_X;
-    CPU -> SP = value;
+    uint8_t value = CPU->Reg_X;
+    CPU->SP = value;
     return 0;
 }
 
 // Tranfer Stack Pointer to Register X 
 // Set zero and negative flags accordingly if accumulator value is negative or zero
 uint8_t TSX(CPU_6502 *CPU){
-    uint8_t value = CPU -> SP;
+    uint8_t value = CPU->SP;
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
-    CPU -> Reg_X = value;
+    CPU->Reg_X = value;
     return 0;
 }
 
@@ -321,10 +452,10 @@ uint8_t NOP(CPU_6502 *CPU){
 uint8_t AND(CPU_6502 *CPU){
     fetch(CPU);
     // A & Fetched
-    uint8_t value = (CPU -> Reg_Acc) & (CPU -> fetched);
+    uint8_t value = (CPU->Reg_Acc) & (CPU->fetched);
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
-    CPU -> Reg_Acc = value;
+    CPU->Reg_Acc = value;
     return 1;
 }
 
@@ -332,10 +463,10 @@ uint8_t AND(CPU_6502 *CPU){
 uint8_t ORA(CPU_6502 *CPU){
     fetch(CPU);
     // A & Fetched
-    uint8_t value = (CPU -> Reg_Acc) | (CPU -> fetched);
+    uint8_t value = (CPU->Reg_Acc) | (CPU->fetched);
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
-    CPU -> Reg_Acc = value;
+    CPU->Reg_Acc = value;
     return 1;
 }
 
@@ -344,10 +475,10 @@ uint8_t ORA(CPU_6502 *CPU){
 uint8_t EOR(CPU_6502 *CPU){
     fetch(CPU);
     // A & Fetched
-    uint8_t value = (CPU -> Reg_Acc) ^ (CPU -> fetched);
+    uint8_t value = (CPU->Reg_Acc) ^ (CPU->fetched);
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
-    CPU -> Reg_Acc = value;
+    CPU->Reg_Acc = value;
     return 1;
 }
 
@@ -359,10 +490,10 @@ uint8_t EOR(CPU_6502 *CPU){
 uint8_t BIT(CPU_6502 *CPU){
     fetch(CPU);
     // A & Fetched
-    uint8_t value = (CPU -> Reg_Acc) & (CPU -> fetched);
+    uint8_t value = (CPU->Reg_Acc) & (CPU->fetched);
     set_flag(CPU, ZERO_F, value == 0);
-    set_flag(CPU, NEGATIVE_F, (CPU -> fetched & NEGATIVE_F) != 0);
-    set_flag(CPU, OVERFLOW_F, (CPU -> fetched & OVERFLOW_F) != 0);
+    set_flag(CPU, NEGATIVE_F, (CPU->fetched & NEGATIVE_F) != 0);
+    set_flag(CPU, OVERFLOW_F, (CPU->fetched & OVERFLOW_F) != 0);
    
     return 0;
 }
@@ -374,36 +505,36 @@ uint8_t BIT(CPU_6502 *CPU){
 // Increment value of Register X
 // Set zero and negative flags accordingly if new value is negative or zero
 uint8_t INX(CPU_6502 *CPU){
-    CPU -> Reg_X++;
-    set_flag(CPU, ZERO_F, CPU -> Reg_X == 0);
-    set_flag(CPU, NEGATIVE_F, (CPU -> Reg_X & NEGATIVE_F) != 0);
+    CPU->Reg_X++;
+    set_flag(CPU, ZERO_F, CPU->Reg_X == 0);
+    set_flag(CPU, NEGATIVE_F, (CPU->Reg_X & NEGATIVE_F) != 0);
     return 0;
 }
 
 // Increment value of Register Y
 // Set zero and negative flags accordingly if new value is negative or zero
 uint8_t INY(CPU_6502 *CPU){
-    CPU -> Reg_Y++;
-    set_flag(CPU, ZERO_F, CPU -> Reg_Y == 0);
-    set_flag(CPU, NEGATIVE_F, (CPU -> Reg_Y & NEGATIVE_F) != 0);
+    CPU->Reg_Y++;
+    set_flag(CPU, ZERO_F, CPU->Reg_Y == 0);
+    set_flag(CPU, NEGATIVE_F, (CPU->Reg_Y & NEGATIVE_F) != 0);
     return 0;
 }  
 
 // Decrement value of Register X
 // Set zero and negative flags accordingly if new value is negative or zero
 uint8_t DEX(CPU_6502 *CPU){
-    CPU -> Reg_X--;
-    set_flag(CPU, ZERO_F, CPU -> Reg_X == 0);
-    set_flag(CPU, NEGATIVE_F, (CPU -> Reg_X & NEGATIVE_F) != 0);
+    CPU->Reg_X--;
+    set_flag(CPU, ZERO_F, CPU->Reg_X == 0);
+    set_flag(CPU, NEGATIVE_F, (CPU->Reg_X & NEGATIVE_F) != 0);
     return 0;
 }
 
 // Decrement value of Register Y
 // Set zero and negative flags accordingly if new value is negative or zero
 uint8_t DEY(CPU_6502 *CPU){
-    CPU -> Reg_Y--;
-    set_flag(CPU, ZERO_F, CPU -> Reg_Y == 0);
-    set_flag(CPU, NEGATIVE_F, (CPU -> Reg_Y & NEGATIVE_F) != 0);
+    CPU->Reg_Y--;
+    set_flag(CPU, ZERO_F, CPU->Reg_Y == 0);
+    set_flag(CPU, NEGATIVE_F, (CPU->Reg_Y & NEGATIVE_F) != 0);
     return 0;
 }
 
@@ -413,11 +544,11 @@ uint8_t DEY(CPU_6502 *CPU){
 // Typically after a CLC for first byte
 uint8_t ADC(CPU_6502 *CPU){
     fetch(CPU);
-    uint8_t A = CPU -> Reg_Acc;
-    uint8_t memory = CPU -> fetched;
+    uint8_t A = CPU->Reg_Acc;
+    uint8_t memory = CPU->fetched;
     uint16_t real_value = (uint16_t)A + (uint16_t)(memory) + (uint16_t)get_flag(CPU, CARRY_F);
-    CPU -> Reg_Acc = (uint8_t)real_value;
-    uint8_t result = CPU -> Reg_Acc;
+    CPU->Reg_Acc = (uint8_t)real_value;
+    uint8_t result = CPU->Reg_Acc;
     
     // Checks for overflow (this trick checks the signs of the new value, old value, and fetched value)
     set_flag(CPU, OVERFLOW_F, ((result ^ A) & (result ^ memory) & 0x80) != 0);
@@ -438,11 +569,11 @@ uint8_t ADC(CPU_6502 *CPU){
 // A = A - memory - ~C or A = A + ~memory + C
 uint8_t SBC(CPU_6502 *CPU){
     fetch(CPU);
-    uint8_t A = CPU -> Reg_Acc; 
-    uint8_t memory = CPU -> fetched;
+    uint8_t A = CPU->Reg_Acc; 
+    uint8_t memory = CPU->fetched;
     uint16_t real_value = (uint16_t)A + (uint16_t)(~memory) + (uint16_t)get_flag(CPU, CARRY_F);
-    CPU -> Reg_Acc = (uint8_t)real_value;
-    uint8_t result = CPU -> Reg_Acc;
+    CPU->Reg_Acc = (uint8_t)real_value;
+    uint8_t result = CPU->Reg_Acc;
 
     // Checks for overflow (this trick checks the signs of the new value, old value, and fetched value)
     set_flag(CPU, OVERFLOW_F, ((result ^ A) & (result ^ ~memory) & 0x80) != 0);
@@ -467,10 +598,10 @@ uint8_t SBC(CPU_6502 *CPU){
 // Adjust flags
 uint8_t INC(CPU_6502 *CPU){
     fetch(CPU);
-    CPU -> fetched++;
-    CPU -> cpu_write(CPU, CPU -> addr_abs, CPU -> fetched);
-    set_flag(CPU, ZERO_F, CPU -> fetched == 0);
-    set_flag(CPU, NEGATIVE_F, (CPU -> fetched & NEGATIVE_F) != 0);
+    CPU->fetched++;
+    CPU->cpu_write(CPU, CPU->addr_abs, CPU->fetched);
+    set_flag(CPU, ZERO_F, CPU->fetched == 0);
+    set_flag(CPU, NEGATIVE_F, (CPU->fetched & NEGATIVE_F) != 0);
     return 0;
 }
 
@@ -480,19 +611,19 @@ uint8_t INC(CPU_6502 *CPU){
 // Adjust flags
 uint8_t DEC(CPU_6502 *CPU){
     fetch(CPU);
-    CPU -> fetched--;
-    CPU -> cpu_write(CPU, CPU -> addr_abs, CPU -> fetched);
-    set_flag(CPU, ZERO_F, CPU -> fetched == 0);
-    set_flag(CPU, NEGATIVE_F, (CPU -> fetched & NEGATIVE_F) != 0);
+    CPU->fetched--;
+    CPU->cpu_write(CPU, CPU->addr_abs, CPU->fetched);
+    set_flag(CPU, ZERO_F, CPU->fetched == 0);
+    set_flag(CPU, NEGATIVE_F, (CPU->fetched & NEGATIVE_F) != 0);
     return 0;
 }
 
-////////////////////
+///////////////////////
 ////////JUMPS CODES///////
-////////////////////
+//////////////////////////
 
 uint8_t JMP(CPU_6502 *CPU){
-    CPU -> PC = CPU -> addr_abs;
+    CPU->PC = CPU->addr_abs;
     return 0;
 }
 
@@ -501,13 +632,13 @@ uint8_t JMP(CPU_6502 *CPU){
 // Then adjust PC to fetched value;
 uint8_t JSR(CPU_6502 *CPU){
     fetch(CPU);
-    uint8_t lowbyte = (CPU -> PC - 1) & (0xFF);
-    uint8_t highbyte =  ((CPU -> PC - 1) >> 8) & (0XFF);
-    CPU -> cpu_write(CPU, CPU -> SP + STACK_START, highbyte);
-    CPU -> SP--;
-    CPU -> cpu_write(CPU, CPU -> SP + STACK_START, lowbyte);
-    CPU -> SP--;
-    CPU -> PC = CPU -> fetched;
+    uint8_t lowbyte = (CPU->PC - 1) & (0xFF);
+    uint8_t highbyte =  ((CPU->PC - 1) >> 8) & (0XFF);
+    CPU->cpu_write(CPU, CPU->SP + STACK_START, highbyte);
+    CPU->SP--;
+    CPU->cpu_write(CPU, CPU->SP + STACK_START, lowbyte);
+    CPU->SP--;
+    CPU->PC = CPU->fetched;
     return 0;
 }
 
@@ -516,12 +647,12 @@ uint8_t JSR(CPU_6502 *CPU){
 // Then increments it, matches JSR
 uint8_t RTS(CPU_6502 *CPU){
     fetch(CPU);
-    CPU -> SP++;
-    uint8_t lowbyte = CPU -> cpu_read(CPU, CPU -> SP + STACK_START, false);
-    CPU -> SP++;
-    uint8_t highbyte = CPU -> cpu_read(CPU, CPU -> SP + STACK_START, false);
-    CPU -> PC = (((uint16_t)highbyte) << 8) | lowbyte;
-    CPU -> PC++;
+    CPU->SP++;
+    uint8_t lowbyte = CPU->cpu_read(CPU, CPU->SP + STACK_START, false);
+    CPU->SP++;
+    uint8_t highbyte = CPU->cpu_read(CPU, CPU->SP + STACK_START, false);
+    CPU->PC = (((uint16_t)highbyte) << 8) | lowbyte;
+    CPU->PC++;
     return 0;
 }
 
@@ -531,27 +662,27 @@ uint8_t RTS(CPU_6502 *CPU){
 // Push Flag with Break set
 // Sets PC to 0xFFFE -0xFFFF for IRQ handler
 uint8_t BRK(CPU_6502 *CPU){
-    uint8_t lowbyte = (CPU -> PC - 1) & (0xFF);
-    uint8_t highbyte =  ((CPU -> PC - 1) >> 8) & (0XFF);
-    CPU -> cpu_write(CPU, CPU -> SP + STACK_START, highbyte);
-    CPU -> SP--;
-    CPU -> cpu_write(CPU, CPU -> SP + STACK_START, lowbyte);
-    CPU -> SP--;
+    uint8_t lowbyte = (CPU->PC - 1) & (0xFF);
+    uint8_t highbyte =  ((CPU->PC - 1) >> 8) & (0XFF);
+    CPU->cpu_write(CPU, CPU->SP + STACK_START, highbyte);
+    CPU->SP--;
+    CPU->cpu_write(CPU, CPU->SP + STACK_START, lowbyte);
+    CPU->SP--;
     
 
     set_flag(CPU, INTERRUPT_D_F, true);
     set_flag(CPU, BREAK_F, true);
 
-    CPU -> cpu_write(CPU, CPU -> SP + STACK_START, CPU -> Reg_Status);
-    CPU -> SP--;
+    CPU->cpu_write(CPU, CPU->SP + STACK_START, CPU->Reg_Status);
+    CPU->SP--;
 
     set_flag(CPU, BREAK_F, false);
 
-    uint16_t lo = (*CPU -> cpu_read)(CPU, 0xFFFE, false);
-    uint16_t hi = ((*CPU -> cpu_read)(CPU, 0xFFFF, false) << 8);
+    uint16_t lo = (*CPU->cpu_read)(CPU, 0xFFFE, false);
+    uint16_t hi = ((*CPU->cpu_read)(CPU, 0xFFFF, false) << 8);
 
 
-    CPU -> PC = (hi | lo);
+    CPU->PC = (hi | lo);
     
     return 0;
 }
@@ -564,18 +695,103 @@ uint8_t BRK(CPU_6502 *CPU){
 // Left shift Accumulator or Memory Value by 1
 // Sets Flags accordingly.
 uint8_t ASL(CPU_6502 *CPU){
-    return;
+    
+    
+    if (CPU -> Instructions[CPU -> opcode].address_mode == &ACC_ADDR){
+        uint8_t original = CPU -> Reg_Acc;
+        set_flag(CPU, ZERO_F, original == 0);
+        set_flag(CPU, CARRY_F, (original & 0x80) != 0);
+        original <<= 1;
+        set_flag(CPU, NEGATIVE_F, (original & 0x80) != 0);
+        CPU -> Reg_Acc = original;
+        return 0;
+    }
+
+
+    fetch(CPU);
+    uint8_t original = CPU -> fetched;
+    set_flag(CPU, ZERO_F, original == 0);
+    set_flag(CPU, CARRY_F, (original & 0x80) != 0);
+    original <<= 1;
+    set_flag(CPU, NEGATIVE_F, (original & 0x80) != 0);
+    (*CPU -> cpu_write)(CPU, CPU -> addr_abs, original);
+    return 0;
 }
 
+// Right shift Accumulator or Memory Value by 1
+// Sets Flags accordingly.
 uint8_t LSR(CPU_6502 *CPU){
-    return;
-}
-uint8_t ROL(CPU_6502 *CPU){
-    return;
+    if (CPU -> Instructions[CPU -> opcode].address_mode == &ACC_ADDR){
+        uint8_t original = CPU -> Reg_Acc;
+        set_flag(CPU, CARRY_F, (original & 0x1) != 0);
+        set_flag(CPU, NEGATIVE_F, false);
+        original >>= 1;
+        set_flag(CPU, ZERO_F, original == 0);
+        CPU -> Reg_Acc = original;
+        return 0;
+    }
+
+
+    fetch(CPU);
+    uint8_t original = CPU -> fetched;
+    set_flag(CPU, CARRY_F, (original & 0x1) != 0);
+    set_flag(CPU, NEGATIVE_F, false);
+    original >>= 1;
+    set_flag(CPU, ZERO_F, original == 0);
+    (*(CPU -> cpu_write))(CPU, CPU -> addr_abs, original);
+    return 0;
 }
 
+// Rotate Left Accumulator or Memory Value by 1, uses Carry Flag as bit 0, and bit 7 as new Carry Flag
+// Sets Flags accordingly.
+uint8_t ROL(CPU_6502 *CPU){
+    if (CPU -> Instructions[CPU -> opcode].address_mode == &ACC_ADDR){
+        uint8_t original = CPU -> Reg_Acc;
+        uint8_t carry = get_flag(CPU, CARRY_F);
+        set_flag(CPU, CARRY_F, (original & 0x80) != 0);
+        original <<= 1;
+        original |= carry;
+        set_flag(CPU, ZERO_F, original == 0);
+        set_flag(CPU, NEGATIVE_F, (original & 0x80) != 0);
+        CPU -> Reg_Acc = original;
+        return 0;
+    }
+    uint8_t original = CPU -> fetched;
+    uint8_t carry = get_flag(CPU, CARRY_F);
+    set_flag(CPU, CARRY_F, (original & 0x80) != 0);
+    original <<= 1;
+    original |= carry;
+    set_flag(CPU, ZERO_F, original == 0);
+    set_flag(CPU, NEGATIVE_F, (original & 0x80) != 0);
+    (*CPU -> cpu_write)(CPU, CPU -> addr_abs, original);
+    return 0;
+}
+
+// Rotate Right Accumulator or Memory Value by 1, uses Carry Flag as bit 7, and bit 0 as new Carry Flag
+// Sets Flags accordingly.
 uint8_t ROR(CPU_6502 *CPU){
-    return;
+    if (CPU -> Instructions[CPU -> opcode].address_mode == &ACC_ADDR){
+        uint8_t original = CPU -> Reg_Acc;
+        uint8_t carry = get_flag(CPU, CARRY_F);
+        set_flag(CPU, CARRY_F, (original & 0x1) != 0);
+        original >>= 1;
+        original |= (carry << 7);
+        set_flag(CPU, ZERO_F, original == 0);
+        set_flag(CPU, NEGATIVE_F, (original & 0x80) != 0);
+        CPU -> Reg_Acc = original;
+        return 0;
+    }
+    uint8_t original = CPU -> fetched;
+    uint8_t carry = get_flag(CPU, CARRY_F);
+    set_flag(CPU, CARRY_F, (original & 0x1) != 0);
+    original >>= 1;
+    original |= (carry << 7);
+    set_flag(CPU, ZERO_F, original == 0);
+    set_flag(CPU, NEGATIVE_F, (original & 0x80) != 0);
+    (*CPU -> cpu_write)(CPU, CPU -> addr_abs, original);
+    return 0;
+
+    return 0;
 }
 
 
@@ -590,7 +806,7 @@ uint8_t ROR(CPU_6502 *CPU){
 // Compares A to a Memory Value via subtraction
 uint8_t CMP(CPU_6502 *CPU){
     fetch(CPU);
-    uint8_t value = CPU -> Reg_Acc - CPU -> fetched;
+    uint8_t value = CPU->Reg_Acc - CPU->fetched;
     set_flag(CPU, CARRY_F, value >= 0);
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
@@ -602,7 +818,7 @@ uint8_t CMP(CPU_6502 *CPU){
 // Compares X to a Memory Value via subtraction
 uint8_t CPX(CPU_6502 *CPU){
     fetch(CPU);
-    uint8_t value = CPU -> Reg_X - CPU -> fetched;
+    uint8_t value = CPU->Reg_X - CPU->fetched;
     set_flag(CPU, CARRY_F, value >= 0);
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
@@ -613,7 +829,7 @@ uint8_t CPX(CPU_6502 *CPU){
 // Compares Y to a Memory Value via subtraction
 uint8_t CPY(CPU_6502 *CPU){ 
     fetch(CPU);
-    uint8_t value = CPU -> Reg_Y - CPU -> fetched;
+    uint8_t value = CPU->Reg_Y - CPU->fetched;
     set_flag(CPU, CARRY_F, value >= 0);
     set_flag(CPU, ZERO_F, value == 0);
     set_flag(CPU, NEGATIVE_F, (value & NEGATIVE_F) != 0);
@@ -631,12 +847,12 @@ uint8_t CPY(CPU_6502 *CPU){
 uint8_t BCC(CPU_6502 *CPU){
     bool flag = get_flag(CPU, CARRY_F);
     if (flag == 0){
-        CPU -> cycles_left++;
-        uint16_t old_pc = CPU -> PC;
-        uint16_t new_pc = CPU -> PC + CPU ->addr_rel;
-        if (old_pc & 0xFF00 != new_pc & 0xFF00) CPU -> cycles_left++;
+        CPU->cycles_left++;
+        uint16_t old_pc = CPU->PC;
+        uint16_t new_pc = CPU->PC + CPU ->addr_rel;
+        if ((old_pc & 0xFF00) != (new_pc & 0xFF00)) CPU->cycles_left++;
 
-        CPU -> PC = new_pc;
+        CPU->PC = new_pc;
         return 1;
     }
     
@@ -649,12 +865,12 @@ uint8_t BCC(CPU_6502 *CPU){
 uint8_t BCS(CPU_6502 *CPU){
     bool flag = get_flag(CPU, CARRY_F);
     if (flag == 1){
-        CPU -> cycles_left++;
-        uint16_t old_pc = CPU -> PC;
-        uint16_t new_pc = CPU -> PC + CPU ->addr_rel;
-        if (old_pc & 0xFF00 != new_pc & 0xFF00) CPU -> cycles_left++;
+        CPU->cycles_left++;
+        uint16_t old_pc = CPU->PC;
+        uint16_t new_pc = CPU->PC + CPU ->addr_rel;
+        if ((old_pc & 0xFF00) != (new_pc & 0xFF00)) CPU->cycles_left++;
 
-        CPU -> PC = new_pc;
+        CPU->PC = new_pc;
         return 1;
     }
     
@@ -668,12 +884,12 @@ uint8_t BCS(CPU_6502 *CPU){
 uint8_t BEQ(CPU_6502 *CPU){
     bool flag = get_flag(CPU, ZERO_F);
     if (flag == 1){
-        CPU -> cycles_left++;
-        uint16_t old_pc = CPU -> PC;
-        uint16_t new_pc = CPU -> PC + CPU ->addr_rel;
-        if (old_pc & 0xFF00 != new_pc & 0xFF00) CPU -> cycles_left++;
+        CPU->cycles_left++;
+        uint16_t old_pc = CPU->PC;
+        uint16_t new_pc = CPU->PC + CPU ->addr_rel;
+        if ((old_pc & 0xFF00) != (new_pc & 0xFF00)) CPU->cycles_left++;
 
-        CPU -> PC = new_pc;
+        CPU->PC = new_pc;
         return 1;
     }
     
@@ -686,12 +902,12 @@ uint8_t BEQ(CPU_6502 *CPU){
 uint8_t BNE(CPU_6502 *CPU){
     bool flag = get_flag(CPU, ZERO_F);
     if (flag == 0){
-        CPU -> cycles_left++;
-        uint16_t old_pc = CPU -> PC;
-        uint16_t new_pc = CPU -> PC + CPU ->addr_rel;
-        if (old_pc & 0xFF00 != new_pc & 0xFF00) CPU -> cycles_left++;
+        CPU->cycles_left++;
+        uint16_t old_pc = CPU->PC;
+        uint16_t new_pc = CPU->PC + CPU ->addr_rel;
+        if ((old_pc & 0xFF00) != (new_pc & 0xFF00)) CPU->cycles_left++;
 
-        CPU -> PC = new_pc;
+        CPU->PC = new_pc;
         return 1;
     }
     
@@ -704,12 +920,12 @@ uint8_t BNE(CPU_6502 *CPU){
 uint8_t BPL(CPU_6502 *CPU){
     bool flag = get_flag(CPU, NEGATIVE_F);
     if (flag == 0){
-        CPU -> cycles_left++;
-        uint16_t old_pc = CPU -> PC;
-        uint16_t new_pc = CPU -> PC + CPU ->addr_rel;
-        if (old_pc & 0xFF00 != new_pc & 0xFF00) CPU -> cycles_left++;
+        CPU->cycles_left++;
+        uint16_t old_pc = CPU->PC;
+        uint16_t new_pc = CPU->PC + CPU ->addr_rel;
+        if ((old_pc & 0xFF00) != (new_pc & 0xFF00)) CPU->cycles_left++;
 
-        CPU -> PC = new_pc;
+        CPU->PC = new_pc;
         return 1;
     }
     
@@ -718,15 +934,15 @@ uint8_t BPL(CPU_6502 *CPU){
 
 // Branch if Minus
 // If Negative Flag is Set, add the relative address to the program counter to cause a branch
-uint8_t BPL(CPU_6502 *CPU){
+uint8_t BMI(CPU_6502 *CPU){
     bool flag = get_flag(CPU, NEGATIVE_F);
     if (flag == 1){
-        CPU -> cycles_left++;
-        uint16_t old_pc = CPU -> PC;
-        uint16_t new_pc = CPU -> PC + CPU ->addr_rel;
-        if (old_pc & 0xFF00 != new_pc & 0xFF00) CPU -> cycles_left++;
+        CPU->cycles_left++;
+        uint16_t old_pc = CPU->PC;
+        uint16_t new_pc = CPU->PC + CPU ->addr_rel;
+        if ((old_pc & 0xFF00) != (new_pc & 0xFF00)) CPU->cycles_left++;
 
-        CPU -> PC = new_pc;
+        CPU->PC = new_pc;
         return 1;
     }
     
@@ -740,12 +956,12 @@ uint8_t BPL(CPU_6502 *CPU){
 uint8_t BVC(CPU_6502 *CPU){
     bool flag = get_flag(CPU, OVERFLOW_F);
     if (flag == 0){
-        CPU -> cycles_left++;
-        uint16_t old_pc = CPU -> PC;
-        uint16_t new_pc = CPU -> PC + CPU ->addr_rel;
-        if (old_pc & 0xFF00 != new_pc & 0xFF00) CPU -> cycles_left++;
+        CPU->cycles_left++;
+        uint16_t old_pc = CPU->PC;
+        uint16_t new_pc = CPU->PC + CPU ->addr_rel;
+        if ((old_pc & 0xFF00) != (new_pc & 0xFF00)) CPU->cycles_left++;
 
-        CPU -> PC = new_pc;
+        CPU->PC = new_pc;
         return 1;
     }
     
@@ -758,12 +974,12 @@ uint8_t BVC(CPU_6502 *CPU){
 uint8_t BVS(CPU_6502 *CPU){
     bool flag = get_flag(CPU, OVERFLOW_F);
     if (flag == 1){
-        CPU -> cycles_left++;
-        uint16_t old_pc = CPU -> PC;
-        uint16_t new_pc = CPU -> PC + CPU ->addr_rel;
-        if (old_pc & 0xFF00 != new_pc & 0xFF00) CPU -> cycles_left++;
+        CPU->cycles_left++;
+        uint16_t old_pc = CPU->PC;
+        uint16_t new_pc = CPU->PC + CPU ->addr_rel;
+        if ((old_pc & 0xFF00) != (new_pc & 0xFF00)) CPU->cycles_left++;
 
-        CPU -> PC = new_pc;
+        CPU->PC = new_pc;
         return 1;
     }
     
